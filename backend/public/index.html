@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WIZZ Schedule</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 1rem; }
+    section { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.25rem; margin-top: 0; }
+    h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+    input, button, select { padding: 0.4rem 0.6rem; margin: 2px; }
+    button { cursor: pointer; }
+    .error { color: #c00; font-size: 0.9rem; }
+    .success { color: #080; font-size: 0.9rem; }
+    #taskList, #scheduleList { list-style: none; padding: 0; }
+    #taskList li, #scheduleList li { padding: 0.5rem; margin: 4px 0; background: #f0f0f0; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .loggedOut #whenLoggedIn { display: none; }
+    .loggedIn #whenLoggedOut { display: none; }
+    .time { font-size: 0.85rem; color: #555; }
+  </style>
+</head>
+<body>
+  <div id="whenLoggedOut" class="loggedOut">
+    <section>
+      <h1>Login</h1>
+      <input type="text" id="loginUsername" placeholder="Username">
+      <input type="password" id="loginPassword" placeholder="Password">
+      <button id="btnLogin">Login</button>
+      <span id="loginMsg" class="error"></span>
+    </section>
+    <section>
+      <h1>Register</h1>
+      <input type="text" id="regUsername" placeholder="Username">
+      <input type="password" id="regPassword" placeholder="Password">
+      <button id="btnRegister">Register</button>
+      <span id="regMsg" class="error"></span>
+    </section>
+  </div>
+
+  <div id="whenLoggedIn" class="loggedIn" style="display:none;">
+    <p>Logged in as <strong id="currentUser"></strong> <button id="btnLogout">Logout</button></p>
+
+    <section>
+      <h2>Create task (with duration & priority)</h2>
+      <input type="text" id="taskTitle" placeholder="Task title">
+      <input type="number" id="taskDuration" placeholder="Minutes" min="1" style="width:80px">
+      <select id="taskPriority">
+        <option value="1">Priority 1 (low)</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+        <option value="5">5 (high)</option>
+      </select>
+      <button id="btnCreateTask">Add task</button>
+      <span id="createMsg" class="error"></span>
+    </section>
+
+    <section>
+      <h2>My tasks</h2>
+      <ul id="taskList"></ul>
+    </section>
+
+    <section>
+      <h2>My schedule (auto-scheduled)</h2>
+      <p style="font-size:0.9rem;color:#555;">Tasks ordered by priority and deadline, with suggested times.</p>
+      <ul id="scheduleList"></ul>
+    </section>
+  </div>
+
+  <script>
+    const API = '';
+    function getToken() { return localStorage.getItem('token'); }
+    function setToken(t) { if (t) localStorage.setItem('token', t); else localStorage.removeItem('token'); }
+
+    function api(path, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...options.headers };
+      if (getToken()) headers['Authorization'] = 'Bearer ' + getToken();
+      return fetch(API + path, { ...options, headers }).then(async r => {
+        const text = await r.text();
+        let data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (_) {}
+        if (!r.ok) throw new Error(data?.error || r.statusText || 'Request failed');
+        return data;
+      });
+    }
+
+    function showLoggedIn(username) {
+      document.body.classList.add('loggedIn');
+      document.body.classList.remove('loggedOut');
+      document.getElementById('whenLoggedIn').style.display = 'block';
+      document.getElementById('whenLoggedOut').style.display = 'none';
+      document.getElementById('currentUser').textContent = username || '';
+      loadTasks();
+      loadSchedule();
+    }
+
+    function showLoggedOut() {
+      setToken(null);
+      document.body.classList.add('loggedOut');
+      document.body.classList.remove('loggedIn');
+      document.getElementById('whenLoggedIn').style.display = 'none';
+      document.getElementById('whenLoggedOut').style.display = 'block';
+    }
+
+    document.getElementById('btnLogin').onclick = async () => {
+      const msg = document.getElementById('loginMsg');
+      msg.textContent = '';
+      try {
+        const data = await api('/api/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: document.getElementById('loginUsername').value.trim(),
+            password: document.getElementById('loginPassword').value
+          })
+        });
+        setToken(data.token);
+        showLoggedIn(data.user.username);
+      } catch (e) {
+        msg.textContent = e.message;
+      }
+    };
+
+    document.getElementById('btnRegister').onclick = async () => {
+      const msg = document.getElementById('regMsg');
+      msg.textContent = '';
+      try {
+        const data = await api('/api/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: document.getElementById('regUsername').value.trim(),
+            password: document.getElementById('regPassword').value
+          })
+        });
+        setToken(data.token);
+        showLoggedIn(data.user.username);
+      } catch (e) {
+        msg.textContent = e.message;
+      }
+    };
+
+    document.getElementById('btnLogout').onclick = () => showLoggedOut();
+
+    document.getElementById('btnCreateTask').onclick = async () => {
+      const msg = document.getElementById('createMsg');
+      msg.textContent = '';
+      const title = document.getElementById('taskTitle').value.trim();
+      const duration = parseInt(document.getElementById('taskDuration').value, 10) || 30;
+      const priority = parseInt(document.getElementById('taskPriority').value, 10) || 3;
+      if (!title) { msg.textContent = 'Enter a title'; return; }
+      try {
+        await api('/api/tasks', {
+          method: 'POST',
+          body: JSON.stringify({ title, duration_minutes: duration, priority })
+        });
+        document.getElementById('taskTitle').value = '';
+        document.getElementById('taskDuration').value = '';
+        loadTasks();
+        loadSchedule();
+      } catch (e) {
+        msg.textContent = e.message;
+      }
+    };
+
+    function formatTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function loadTasks() {
+      api('/api/tasks').then(tasks => {
+        const ul = document.getElementById('taskList');
+        ul.innerHTML = tasks.length === 0 ? '<li>No tasks yet. Add one above.</li>' : tasks.map(t => {
+          const dur = t.duration_minutes != null ? t.duration_minutes + ' min' : '';
+          const pri = t.priority != null ? 'P' + t.priority : '';
+          return '<li><span>' + escapeHtml(t.title) + ' ' + (dur ? '(' + dur + ') ' : '') + (pri ? pri : '') + '</span>' +
+            '<span><button data-id="' + t.id + '" class="editBtn">Edit</button> <button data-id="' + t.id + '" class="delBtn">Delete</button></span></li>';
+        }).join('');
+        ul.querySelectorAll('.delBtn').forEach(btn => {
+          btn.onclick = () => deleteTask(btn.dataset.id);
+        });
+        ul.querySelectorAll('.editBtn').forEach(btn => {
+          btn.onclick = () => editTask(btn.dataset.id);
+        });
+      }).catch(() => showLoggedOut());
+    }
+
+    function deleteTask(id) {
+      if (!confirm('Delete this task?')) return;
+      api('/api/tasks/' + id, { method: 'DELETE' }).then(() => { loadTasks(); loadSchedule(); });
+    }
+
+    function editTask(id) {
+      const title = prompt('New title:');
+      if (title === null) return;
+      const duration = prompt('Duration (minutes):', '30');
+      const priority = prompt('Priority 1-5:', '3');
+      api('/api/tasks/' + id, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title: title.trim(),
+          duration_minutes: duration ? parseInt(duration, 10) : undefined,
+          priority: priority ? parseInt(priority, 10) : undefined
+        })
+      }).then(() => { loadTasks(); loadSchedule(); }).catch(e => alert(e.message));
+    }
+
+    function loadSchedule() {
+      api('/api/tasks/schedule').then(scheduled => {
+        const ul = document.getElementById('scheduleList');
+        ul.innerHTML = scheduled.length === 0 ? '<li>No tasks to schedule. Add tasks above.</li>' : scheduled.map(t => {
+          const start = formatTime(t.suggested_start);
+          const end = formatTime(t.suggested_end);
+          return '<li><span class="time">' + start + ' – ' + end + '</span> ' + escapeHtml(t.title) + ' (P' + (t.priority || '-') + ', ' + (t.duration_minutes || 0) + ' min)</li>';
+        }).join('');
+      }).catch(() => {});
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    if (getToken()) {
+      api('/api/me').then(u => showLoggedIn(u.username)).catch(() => showLoggedOut());
+    }
+  </script>
+</body>
+</html>
