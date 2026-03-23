@@ -56,6 +56,7 @@ function showPage(name) {
   document.querySelectorAll('.page, .app-page').forEach(p => p.classList.remove('active'));
   const page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
+  if (name === 'board') renderTaskBoard();
 }
 
 /* ============================================
@@ -531,6 +532,9 @@ function drumSetFromString(val) {
 /* Call initDrum whenever the panel opens */
 
 /* ── PRIORITY SELECTOR ── */
+const PRI_LABELS = ['', 'LOW', 'MED-', 'MED', 'MED+', 'HIGH'];
+const PRI_COLORS = ['', 'var(--green)', 'var(--cyan)', 'var(--purple)', '#f59e0b', 'var(--danger)'];
+
 function pickPriority(el) {
   document.querySelectorAll('.pri-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
@@ -791,9 +795,6 @@ function clearSearch() {
    ============================================ */
 
 let taskBoardFilter = 'all';
-
-const PRI_LABELS = ['', 'LOW', 'MED-', 'MED', 'MED+', 'HIGH'];
-const PRI_COLORS = ['', 'var(--green)', 'var(--cyan)', 'var(--purple)', '#f59e0b', 'var(--danger)'];
 
 function setTaskFilter(btn) {
   document.querySelectorAll('.tb-filter').forEach(b => b.classList.remove('active'));

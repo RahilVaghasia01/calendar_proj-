@@ -290,9 +290,30 @@
             </div>
           </div>
 
+          <button class="priority-board-toggle" onclick="showPage('board')">
+            🎯 Priority Mission Board
+          </button>
+
         </div>
       </div><!-- /app-inner -->
 
+    </div><!-- /app-body -->
+  </div><!-- /page-app -->
+
+  <!-- ══════════════════════════════════════
+       PAGE: PRIORITY BOARD
+  ══════════════════════════════════════ -->
+  <div class="app-page" id="page-board">
+
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-left">
+          <button class="btn ghost" onclick="showPage('app')" style="font-size:.7rem;padding:7px 16px">◀ Back to Calendar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-body">
       <!-- ══════════════════════════════════════
            PRIORITY TASK BOARD
            Full-width section below calendar
@@ -360,9 +381,10 @@
 
         </div><!-- /task-lanes -->
       </div><!-- /task-board-wrap -->
+    </div>
 
-    </div><!-- /app-body -->
-  </div><!-- /page-app -->
+  </div><!-- /page-board -->
+
 
 
   <!-- ══════════════════════════════════════
