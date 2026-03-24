@@ -89,9 +89,9 @@ orbitly/
 
 Things that could make Orbitly even better down the line:
 
-🔁 Recurring events
-🌐 Cloud sync / backend integration
-📆 Week and day views
-🎨 Color-coded event categories
-🔔 Browser notifications for upcoming events
-📱 Mobile-responsive polish
+- 🔁 Recurring events
+- 🌐 Cloud sync / backend integration
+- 📆 Week and day views
+- 🎨 Color-coded event categories
+- 🔔 Browser notifications for upcoming events
+- 📱 Mobile-responsive polish
