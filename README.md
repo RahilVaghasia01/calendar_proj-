@@ -51,23 +51,37 @@ orbitly/
 ## 🛠️ Getting Started
 
 1. **Clone or download** this repository  
-2. Make sure all three files are in the **same folder**:
-   - `index.html`
-   - `app.js`
-   - `style.css`
-3. Open `index.html` in any modern web browser — that's it!
 
-### 🖥️ Optional: Run a Local Dev Server
+2. **Install backend dependencies**:
+   ```bash
+   npm install
+   ```
 
-If you want smoother local testing (e.g. avoiding CORS quirks):
+3. **Set up environment variables**:
+   - Copy `.env.example` → `.env`
+   - Fill in any required values
 
-```bash
-# Python 3
-python -m http.server
+4. **Start the backend server**:
+   ```bash
+   node index.js
+   ```
+   or (if using nodemon):
+   ```bash
+   npx nodemon index.js
+   ```
 
-# Then visit:
-# http://localhost:8000
-```
+5. **Run the frontend**:
+   - Open `index.html` directly in your browser  
+   **OR**
+   - Serve it locally for best results:
+
+   ```bash
+   # Python 3
+   python -m http.server
+   ```
+
+   Then visit:  
+   `http://localhost:8000`
 
 ---
 
@@ -75,10 +89,9 @@ python -m http.server
 
 Things that could make Orbitly even better down the line:
 
-- [ ] 🔁 Recurring events
-- [ ] 🌐 Cloud sync / backend integration
-- [ ] 📆 Week and day views
-- [ ] 🎨 Color-coded event categories
-- [ ] 🔔 Browser notifications for upcoming events
-- [ ] 📱 Mobile-responsive polish
-
+🔁 Recurring events
+🌐 Cloud sync / backend integration
+📆 Week and day views
+🎨 Color-coded event categories
+🔔 Browser notifications for upcoming events
+📱 Mobile-responsive polish
