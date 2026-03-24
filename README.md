@@ -71,14 +71,3 @@ Things that could make Orbitly even better down the line:
 - [ ] 🔔 Browser notifications for upcoming events
 - [ ] 📱 Mobile-responsive polish
 
----
-
-## 🤝 Contributing
-
-This is a prototype — feedback, ideas, and pull requests are welcome! Feel free to fork and experiment.
-
----
-
-## 📄 License
-
-MIT — use it, build on it, make it yours.
