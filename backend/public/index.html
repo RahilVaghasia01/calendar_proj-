@@ -204,10 +204,32 @@
             <div class="topbar-user" id="topbar-user">Commander</div>
           </div>
         </div>
+
+        <!-- ── SEARCH BAR ── -->
+        <div class="topbar-search">
+          <div class="search-wrap">
+            <span class="search-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </span>
+            <input type="text" id="search-input" class="search-input" placeholder="Search events..."/>
+            <button class="search-clear" id="search-clear" onclick="clearSearch()" style="display:none">✕</button>
+          </div>
+        </div>
+
         <div class="topbar-right">
           <button class="btn ghost"     onclick="exportCSV()">⬇ CSV</button>
           <button class="btn ghost red" onclick="logout()">Logout</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ── SEARCH RESULTS OVERLAY ── -->
+    <div class="search-results-bar" id="search-results-bar" style="display:none">
+      <div class="search-results-inner">
+        <div class="search-results-label" id="search-results-label">Results</div>
+        <div class="search-results-list"  id="search-results-list"></div>
       </div>
     </div>
 
@@ -251,9 +273,13 @@
               <span class="stat-label">This Month</span>
               <span class="stat-val" id="stat-month">0</span>
             </div>
-            <div class="stat-row" style="margin-bottom:0">
+            <div class="stat-row">
               <span class="stat-label">Next 7 Days</span>
               <span class="stat-val" id="stat-week">0</span>
+            </div>
+            <div class="stat-row" style="margin-bottom:0">
+              <span class="stat-label">Completed</span>
+              <span class="stat-val" id="stat-done" style="color:var(--green)">0</span>
             </div>
           </div>
 
@@ -265,9 +291,78 @@
           </div>
 
         </div>
-      </div>
-    </div>
-  </div>
+      </div><!-- /app-inner -->
+
+      <!-- ══════════════════════════════════════
+           PRIORITY TASK BOARD
+           Full-width section below calendar
+      ══════════════════════════════════════ -->
+      <div class="task-board-wrap">
+        <div class="task-board-header">
+          <div class="task-board-title">
+            <span class="task-board-icon">🎯</span> Priority Mission Board
+          </div>
+          <div class="task-board-filters">
+            <button class="tb-filter active" data-f="all"      onclick="setTaskFilter(this)">All</button>
+            <button class="tb-filter"        data-f="pending"  onclick="setTaskFilter(this)">Pending</button>
+            <button class="tb-filter"        data-f="done"     onclick="setTaskFilter(this)">Done</button>
+            <button class="tb-filter"        data-f="overdue"  onclick="setTaskFilter(this)">Overdue</button>
+          </div>
+        </div>
+
+        <!-- Five priority lanes -->
+        <div class="task-lanes" id="task-lanes">
+
+          <div class="task-lane" id="lane-5">
+            <div class="lane-header">
+              <span class="lane-dot" style="background:var(--danger)"></span>
+              <span class="lane-label">HIGH</span>
+              <span class="lane-count" id="lane-count-5">0</span>
+            </div>
+            <div class="lane-cards" id="lane-cards-5"></div>
+          </div>
+
+          <div class="task-lane" id="lane-4">
+            <div class="lane-header">
+              <span class="lane-dot" style="background:#f59e0b"></span>
+              <span class="lane-label">MED+</span>
+              <span class="lane-count" id="lane-count-4">0</span>
+            </div>
+            <div class="lane-cards" id="lane-cards-4"></div>
+          </div>
+
+          <div class="task-lane" id="lane-3">
+            <div class="lane-header">
+              <span class="lane-dot" style="background:var(--purple)"></span>
+              <span class="lane-label">MED</span>
+              <span class="lane-count" id="lane-count-3">0</span>
+            </div>
+            <div class="lane-cards" id="lane-cards-3"></div>
+          </div>
+
+          <div class="task-lane" id="lane-2">
+            <div class="lane-header">
+              <span class="lane-dot" style="background:var(--cyan)"></span>
+              <span class="lane-label">MED−</span>
+              <span class="lane-count" id="lane-count-2">0</span>
+            </div>
+            <div class="lane-cards" id="lane-cards-2"></div>
+          </div>
+
+          <div class="task-lane" id="lane-1">
+            <div class="lane-header">
+              <span class="lane-dot" style="background:var(--green)"></span>
+              <span class="lane-label">LOW</span>
+              <span class="lane-count" id="lane-count-1">0</span>
+            </div>
+            <div class="lane-cards" id="lane-cards-1"></div>
+          </div>
+
+        </div><!-- /task-lanes -->
+      </div><!-- /task-board-wrap -->
+
+    </div><!-- /app-body -->
+  </div><!-- /page-app -->
 
 
   <!-- ══════════════════════════════════════
@@ -283,6 +378,7 @@
       <div class="add-event-form">
         <div class="form-heading" id="form-heading">New Event</div>
 
+        <!-- Event Name -->
         <div class="field">
           <label>Event Name</label>
           <div class="input-wrap">
@@ -290,11 +386,56 @@
           </div>
         </div>
 
-        <div class="inline-row">
-          <div class="field">
-            <label>Time</label>
-            <input type="text" id="ev-time" class="bare" placeholder="14:00"/>
+        <!-- Time: type manually OR use the scroll drum picker -->
+        <div class="field">
+          <label>Time</label>
+          <div class="time-picker-wrap">
+
+            <!-- Manual text input -->
+            <input type="text" id="ev-time" class="bare time-input" placeholder="e.g. 14:00  or  All day"/>
+
+            <!-- Drum / scroll picker -->
+            <div class="drum-picker">
+
+              <!-- Hour drum -->
+              <div class="drum-col" id="drum-hour">
+                <div class="drum-track" id="drum-hour-track"></div>
+              </div>
+
+              <div class="drum-sep">:</div>
+
+              <!-- Minute drum -->
+              <div class="drum-col" id="drum-minute">
+                <div class="drum-track" id="drum-minute-track"></div>
+              </div>
+
+              <!-- AM / PM drum -->
+              <div class="drum-col drum-col-ampm" id="drum-ampm">
+                <div class="drum-track" id="drum-ampm-track"></div>
+              </div>
+
+              <!-- All Day toggle -->
+              <button type="button" class="drum-allday" id="drum-allday-btn" onclick="toggleAllDay()">All day</button>
+
+            </div><!-- /drum-picker -->
+
           </div>
+        </div>
+
+        <!-- Priority + Colour row -->
+        <div class="inline-row">
+
+          <div class="field">
+            <label>Priority</label>
+            <div class="priority-pick" id="priority-pick">
+              <button type="button" class="pri-btn" data-p="1" onclick="pickPriority(this)">LOW</button>
+              <button type="button" class="pri-btn" data-p="2" onclick="pickPriority(this)">MED-</button>
+              <button type="button" class="pri-btn active" data-p="3" onclick="pickPriority(this)">MED</button>
+              <button type="button" class="pri-btn" data-p="4" onclick="pickPriority(this)">MED+</button>
+              <button type="button" class="pri-btn" data-p="5" onclick="pickPriority(this)">HIGH</button>
+            </div>
+          </div>
+
           <div class="field">
             <label>Colour</label>
             <div class="color-pick">
@@ -305,6 +446,7 @@
               <div class="color-dot"        style="background:var(--danger)" data-c="4" onclick="pickColor(this)"></div>
             </div>
           </div>
+
         </div>
 
         <div class="panel-actions">
