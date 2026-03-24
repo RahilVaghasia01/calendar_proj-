@@ -1,11 +1,13 @@
 {
   "name": "wizz-backend",
   "version": "1.0.0",
-  "description": "WIZZ scheduling app API - Week 1 starter (SQLite, no external services)",
+  "description": "WIZZ scheduling app API — JSON store, Express, JWT auth",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --runInBand --watch"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -13,5 +15,9 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
   }
 }

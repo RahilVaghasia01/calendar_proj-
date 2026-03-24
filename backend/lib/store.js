@@ -1,20 +1,27 @@
 const fs = require('fs');
 const path = require('path');
 
-const filePath = path.join(__dirname, '..', 'wizz.json');
+/** Set WIZZ_JSON_PATH in tests so Jest uses an isolated file (see test/). */
+function getFilePath() {
+  return process.env.WIZZ_JSON_PATH || path.join(__dirname, '..', 'wizz.json');
+}
 
 function load() {
   try {
-    const data = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(data);
+    const data = fs.readFileSync(getFilePath(), 'utf8');
+    const parsed = JSON.parse(data);
+    if (!parsed.users) parsed.users = [];
+    if (!parsed.tasks) parsed.tasks = [];
+    if (!parsed.notifications) parsed.notifications = [];
+    return parsed;
   } catch (e) {
-    if (e.code === 'ENOENT') return { users: [], tasks: [] };
+    if (e.code === 'ENOENT') return { users: [], tasks: [], notifications: [] };
     throw e;
   }
 }
 
 function save(data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  fs.writeFileSync(getFilePath(), JSON.stringify(data, null, 2), 'utf8');
 }
 
 function nextId(arr) {
@@ -31,6 +38,9 @@ const db = {
   },
   get task() {
     return load().tasks;
+  },
+  get notification() {
+    return load().notifications;
   },
 
   getUserByUsername(username) {
@@ -112,6 +122,69 @@ const db = {
     data.tasks.splice(idx, 1);
     save(data);
     return { changes: 1 };
+  },
+
+  createNotification(row) {
+    const data = load();
+    const id = nextId(data.notifications);
+    const notification = {
+      id,
+      user_id: row.user_id,
+      type: row.type || 'general',
+      title: row.title || 'Notification',
+      message: row.message || '',
+      task_id: row.task_id ?? null,
+      is_read: false,
+      created_at: now(),
+    };
+    data.notifications.push(notification);
+    save(data);
+    return notification;
+  },
+
+  getNotificationsByUserId(userId) {
+    const notifications = load().notifications.filter(n => n.user_id === userId);
+    notifications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return notifications;
+  },
+
+  getNotificationByIdAndUserId(id, userId) {
+    return load().notifications.find(n => n.id === id && n.user_id === userId) || null;
+  },
+
+  markNotificationRead(id, userId) {
+    const data = load();
+    const idx = data.notifications.findIndex(n => n.id === id && n.user_id === userId);
+    if (idx === -1) return null;
+    data.notifications[idx].is_read = true;
+    save(data);
+    return data.notifications[idx];
+  },
+
+  markAllNotificationsRead(userId) {
+    const data = load();
+    let count = 0;
+    data.notifications.forEach((n, idx) => {
+      if (n.user_id === userId && !n.is_read) {
+        data.notifications[idx].is_read = true;
+        count += 1;
+      }
+    });
+    if (count > 0) save(data);
+    return count;
+  },
+
+  getUnreadNotificationCount(userId) {
+    return load().notifications.filter(n => n.user_id === userId && !n.is_read).length;
+  },
+
+  /** Notification bell / dashboard — TDD feature (GET /api/notifications/summary). */
+  getNotificationSummary(userId) {
+    const list = load().notifications.filter(n => n.user_id === userId);
+    return {
+      total: list.length,
+      unread: list.filter(n => !n.is_read).length,
+    };
   },
 };
 

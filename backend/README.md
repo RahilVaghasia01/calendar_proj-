@@ -51,25 +51,48 @@ The first time you run, the app creates `wizz.json` in the backend folder with e
 | POST | `/api/tasks` | Bearer token | Create task. Body: `title`, optional: `description`, `status`, `duration_minutes`, `priority`, `deadline`. |
 | PATCH | `/api/tasks/:id` | Bearer token | Update task |
 | DELETE | `/api/tasks/:id` | Bearer token | Delete task |
+| PATCH | `/api/tasks/:id/toggle` | Bearer token | Toggle task `done` / `todo` |
+| GET | `/api/tasks/search?q=` | Bearer token | Search tasks by title/description |
+| GET | `/api/notifications` | Bearer token | List notifications (newest first) |
+| GET | `/api/notifications/unread-count` | Bearer token | `{ count }` unread |
+| GET | `/api/notifications/summary` | Bearer token | `{ total, unread }` for notification bell (TDD demo feature) |
+| PATCH | `/api/notifications/:id/read` | Bearer token | Mark one notification read |
+| PATCH | `/api/notifications/read-all` | Bearer token | Mark all read `{ updated }` |
 
 **Auth:** After login or register, the response includes a `token`. The frontend should send it on later requests in the header:  
 `Authorization: Bearer <token>`.
 
+## Automated tests (Jest + Supertest)
+
+From `backend/`:
+
+```bash
+npm test
+```
+
+Tests use a **temporary JSON file** via `WIZZ_JSON_PATH` — your real `wizz.json` is not modified.
+
+**Customer / course demo (TDD Red → Green):** see [docs/CUSTOMER_DEMO_TDD.md](docs/CUSTOMER_DEMO_TDD.md).
+
 ## Folder layout
 
-- `index.js` – Express app, CORS, JSON, static frontend, routes
+- `index.js` – starts the HTTP server (`listen`)
+- `app.js` – builds the Express app (no listen; used by tests)
 - `lib/db.js` – exports the JSON store
-- `lib/store.js` – reads/writes `wizz.json` (users and tasks)
+- `lib/store.js` – reads/writes `wizz.json` (users, tasks, notifications)
 - `middleware/auth.js` – Validates JWT and sets `req.user`
 - `routes/auth.js` – Register, login, GET /api/me
-- `routes/tasks.js` – Task CRUD + GET /api/tasks/schedule (auto-schedule)
-- `public/index.html` – Single-page UI: login, register, create/edit/delete tasks, view schedule
+- `routes/tasks.js` – Task CRUD, schedule, search, toggle
+- `routes/notifications.js` – Notifications + summary
+- `test/` – Jest tests
+- `public/` – Frontend (`index.html`, `App.js`, `Style.css`)
 
 ## Database (JSON file)
 
 - Data is stored in **wizz.json** in the backend folder.
 - **users** – `id`, `username`, `password_hash`
 - **tasks** – `id`, `user_id`, `title`, `description`, `status`, `duration_minutes`, `priority`, `deadline`, `created_at`, `updated_at`
+- **notifications** – `id`, `user_id`, `type`, `title`, `message`, `task_id`, `is_read`, `created_at`
 
 No SQLite or other database install required.
 
@@ -102,7 +125,7 @@ How each part was done, in brief.
 
 ### Data layer (no Supabase / no native DB)
 - Replaced Supabase and SQLite with a **JSON file** so no cloud signup and no C++ build (avoids Node 25 + Windows VS build issues).
-- **`lib/store.js`:** `load()` reads `wizz.json` (or returns `{ users: [], tasks: [] }` if missing), `save(data)` writes it back. Helpers: `nextId(arr)`, `now()`. Methods: `getUserByUsername`, `getUserById`, `createUser`; `getTasksByUserId`, `getTaskByIdAndUserId`, `getTasksForSchedule`, `createTask`, `updateTask`, `deleteTask`.
+- **`lib/store.js`:** `load()` reads `wizz.json` (or empty shape if missing), `save(data)` writes it back. Optional env **`WIZZ_JSON_PATH`** for tests. Includes users, tasks, notifications helpers including `getNotificationSummary`.
 - **`lib/db.js`:** Just `module.exports = require('./store')` so rest of app uses `require('../lib/db')`.
 
 ### Frontend (single page, no build)

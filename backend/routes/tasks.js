@@ -6,6 +6,16 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+function notify(userId, type, title, message, taskId = null) {
+  db.createNotification({
+    user_id: userId,
+    type,
+    title,
+    message,
+    task_id: taskId,
+  });
+}
+
 /**
  * GET /api/tasks/schedule
  * Auto-schedule: tasks sorted by priority (high first), then deadline, then duration.
@@ -47,6 +57,35 @@ router.get('/', (req, res) => {
 });
 
 /**
+ * GET /api/tasks/search?q=...
+ * Search tasks by title (and optional description).
+ */
+router.get('/search', (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim().toLowerCase();
+    if (!q) return res.json([]);
+
+    const tasks = db.getTasksByUserId(req.user.id);
+    const results = tasks.filter(t => {
+      const title = (t.title || '').toLowerCase();
+      const description = (t.description || '').toLowerCase();
+      return title.includes(q) || description.includes(q);
+    });
+
+    results.sort((a, b) => {
+      const da = a.deadline || '9999-12-31';
+      const dbd = b.deadline || '9999-12-31';
+      return da.localeCompare(dbd);
+    });
+
+    res.json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Failed to search tasks' });
+  }
+});
+
+/**
  * GET /api/tasks/:id
  */
 router.get('/:id', (req, res) => {
@@ -79,6 +118,13 @@ router.post('/', (req, res) => {
       priority: priority ?? null,
       deadline: deadline ?? null,
     });
+    notify(
+      req.user.id,
+      'task_created',
+      'Task created',
+      `You created "${task.title}".`,
+      task.id
+    );
     res.status(201).json(task);
   } catch (err) {
     console.error(err);
@@ -107,6 +153,13 @@ router.patch('/:id', (req, res) => {
     const id = Number(req.params.id);
     const task = db.updateTask(id, req.user.id, updates);
     if (!task) return res.status(404).json({ error: 'Task not found' });
+    notify(
+      req.user.id,
+      'task_updated',
+      'Task updated',
+      `You updated "${task.title}".`,
+      task.id
+    );
     res.json(task);
   } catch (err) {
     console.error(err);
@@ -119,12 +172,50 @@ router.patch('/:id', (req, res) => {
  */
 router.delete('/:id', (req, res) => {
   try {
+    const existing = db.getTaskByIdAndUserId(Number(req.params.id), req.user.id);
     const result = db.deleteTask(Number(req.params.id), req.user.id);
     if (result.changes === 0) return res.status(404).json({ error: 'Task not found' });
+    if (existing) {
+      notify(
+        req.user.id,
+        'task_deleted',
+        'Task deleted',
+        `You deleted "${existing.title}".`,
+        existing.id
+      );
+    }
     res.status(204).send();
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || 'Failed to delete task' });
+  }
+});
+
+/**
+ * PATCH /api/tasks/:id/toggle
+ * Toggle task status between todo and done.
+ */
+router.patch('/:id/toggle', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existing = db.getTaskByIdAndUserId(id, req.user.id);
+    if (!existing) return res.status(404).json({ error: 'Task not found' });
+
+    const nextStatus = existing.status === 'done' ? 'todo' : 'done';
+    const task = db.updateTask(id, req.user.id, { status: nextStatus });
+
+    notify(
+      req.user.id,
+      'task_status',
+      nextStatus === 'done' ? 'Task completed' : 'Task reopened',
+      `"${task.title}" is now ${nextStatus}.`,
+      task.id
+    );
+
+    res.json(task);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Failed to toggle task status' });
   }
 });
 
