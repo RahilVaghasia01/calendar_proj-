@@ -8,8 +8,6 @@
 
 Orbitly is a **prototype** frontend calendar web app built for personal event management. Create an account, log in, and take control of your schedule — all without leaving your browser. Your data stays on your device, private and instant.
 
-> ⚠️ **Heads up:** This is an early prototype. Data is stored in your browser's `localStorage`, so clearing your browser data will wipe your events.
-
 ---
 
 ## 🚀 Features
