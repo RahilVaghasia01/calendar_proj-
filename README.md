@@ -29,10 +29,23 @@ Orbitly is a **prototype** frontend calendar web app built for personal event ma
 
 ```
 orbitly/
-├── index.html   # App shell and layout
-├── style.css    # Styles and visual design
-├── app.js       # All app logic and interactivity
-└── README.md    # You are here
+├── backend/           # Backend server logic
+│   ├── lib/           # Utility/helper modules
+│   ├── middleware/    # Express middleware (auth, validation, etc.)
+│   ├── public/        # Static assets served by backend
+│   ├── routes/        # API route handlers
+│   └── index.js       # Backend entry point
+│
+├── .env.example       # Environment variable template
+├── .gitignore         # Git ignored files
+├── package.json       # Project dependencies and scripts
+├── package-lock.json  # Dependency lock file
+│
+├── index.html         # Frontend app shell
+├── style.css          # Frontend styles
+├── app.js             # Frontend logic
+│
+└── README.md          # Project documentation
 ```
 
 ---
