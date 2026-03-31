@@ -56,7 +56,6 @@ function showPage(name) {
   document.querySelectorAll('.page, .app-page').forEach(p => p.classList.remove('active'));
   const page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
-  if (name === 'board') renderTaskBoard();
 }
 
 /* ============================================
@@ -187,6 +186,7 @@ async function loadEventsFromAPI() {
   try {
     tasksCache  = await api('/api/tasks');
     eventsCache = tasksCache.map(taskToEvent).filter(e => e.date !== null);
+    expandRoutineIntoCache();   // add recurring routine events on top
     renderTaskBoard();
   } catch (e) {
     if (e.message.toLowerCase().includes('token') || e.message.includes('401')) logout();
@@ -205,12 +205,14 @@ async function initCalendar() {
   renderCalendar();
   updateStats();
   updateUpcoming();
+  showReminderPopup();
 }
 
 function changeMonth(dir) {
   viewMonth += dir;
   if (viewMonth < 0)  { viewMonth = 11; viewYear--; }
   if (viewMonth > 11) { viewMonth = 0;  viewYear++; }
+  expandRoutineIntoCache();   // re-expand for the new month range
   renderCalendar();
   updateStats();
   updateUpcoming();
@@ -532,9 +534,6 @@ function drumSetFromString(val) {
 /* Call initDrum whenever the panel opens */
 
 /* ── PRIORITY SELECTOR ── */
-const PRI_LABELS = ['', 'LOW', 'MED-', 'MED', 'MED+', 'HIGH'];
-const PRI_COLORS = ['', 'var(--green)', 'var(--cyan)', 'var(--purple)', '#f59e0b', 'var(--danger)'];
-
 function pickPriority(el) {
   document.querySelectorAll('.pri-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
@@ -543,6 +542,10 @@ function pickPriority(el) {
 
 /* ── TOGGLE COMPLETION ── */
 async function toggleDone(id) {
+  if (String(id).startsWith('rt-')) {
+    alert('Recurring routine events cannot be marked done. You can delete the routine step from "My Daily Routine".');
+    return;
+  }
   try {
     await api('/api/tasks/' + id + '/toggle', { method: 'PATCH' });
     await loadEventsFromAPI();
@@ -628,6 +631,12 @@ async function addEvent() {
 
 /* ── DELETE EVENT ── */
 async function deleteEvent(id) {
+  if (String(id).startsWith('rt-')) {
+    // This is a routine event — offer to delete the routine step instead
+    const step = getRoutineSteps().find(s => 'rt-' + s.id === String(id).slice(0, 3 + s.id.length + 1).replace(/-\d{4}-\d{2}-\d{2}$/, ''));
+    alert('This is a recurring routine event. Edit or delete it from the "My Daily Routine" panel.');
+    return;
+  }
   try {
     await api('/api/tasks/' + id, { method: 'DELETE' });
     if (editingId === id) resetForm();
@@ -787,6 +796,21 @@ function clearSearch() {
 }
 
 
+
+/* ── BOARD MODAL open / close ── */
+function openBoardModal() {
+  renderTaskBoard();   // always refresh when opening
+  document.getElementById('board-overlay').classList.add('open');
+}
+
+function closeBoardModal() {
+  document.getElementById('board-overlay').classList.remove('open');
+}
+
+function closeBoardOutside(e) {
+  if (e.target === document.getElementById('board-overlay')) closeBoardModal();
+}
+
 /* ============================================
    PRIORITY TASK BOARD
    Renders all tasks sorted by priority (5→1)
@@ -795,6 +819,9 @@ function clearSearch() {
    ============================================ */
 
 let taskBoardFilter = 'all';
+
+const PRI_LABELS = ['', 'LOW', 'MED-', 'MED', 'MED+', 'HIGH'];
+const PRI_COLORS = ['', 'var(--green)', 'var(--cyan)', 'var(--purple)', '#f59e0b', 'var(--danger)'];
 
 function setTaskFilter(btn) {
   document.querySelectorAll('.tb-filter').forEach(b => b.classList.remove('active'));
@@ -892,11 +919,11 @@ function buildTaskCard(t, now) {
     }
 
     duePart = `<div class="${dueClass}">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0">
         <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
         <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
       </svg>
-      ${dateLabel} ${dueBadge}
+      <span style="white-space:nowrap">${dateLabel}</span>${dueBadge ? ' ' + dueBadge : ''}
     </div>`;
   }
 
@@ -919,7 +946,7 @@ function buildTaskCard(t, now) {
                   title="${isDone ? 'Mark incomplete' : 'Mark complete'}">
             ${isDone ? '&#10004;' : ''}
           </button>
-          <div class="tc-title">${escHtml(t.title)}</div>
+          <div class="tc-title" title="${escHtml(t.title)}">${escHtml(t.title)}</div>
         </div>
         ${timePart}
         ${duePart}
@@ -950,6 +977,338 @@ function boardJumpTo(dateStr) {
   updateStats();
   updateUpcoming();
   openPanel(dateStr);
+}
+
+
+
+
+/* ============================================
+   LOGIN REMINDER POPUP
+   Shows once on login if any tasks are
+   overdue or due today. User can close it.
+   ============================================ */
+
+function showReminderPopup() {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  // Collect overdue and due-today tasks (skip completed ones)
+  const overdue = [];
+  const dueToday = [];
+
+  eventsCache.forEach(e => {
+    if (e.done || !e.date) return;
+    const due  = new Date(e.date);
+    const diff = Math.ceil((due - now) / 864e5);
+    if (diff < 0)        overdue.push({ ...e, diff });
+    else if (diff === 0) dueToday.push({ ...e, diff });
+  });
+
+  // Sort by priority (highest first)
+  const byPri = (a, b) => (b.priority || 3) - (a.priority || 3);
+  overdue.sort(byPri);
+  dueToday.sort(byPri);
+
+  const all = [...overdue, ...dueToday];
+
+  // Nothing to remind about — don't show popup
+  if (!all.length) return;
+
+  // Update subtitle text
+  const subtitle = document.getElementById('reminder-subtitle');
+  const od = overdue.length, td = dueToday.length;
+  let msg = '';
+  if (od && td) msg = `${od} overdue and ${td} due today`;
+  else if (od)  msg = `${od} overdue task${od > 1 ? 's' : ''} need attention`;
+  else          msg = `${td} task${td > 1 ? 's' : ''} due today`;
+  subtitle.textContent = msg;
+
+  // Build the task list
+  const PRI_LABELS = ['','LOW','MED-','MED','MED+','HIGH'];
+  const PRI_COLORS = ['','var(--green)','var(--cyan)','var(--purple)','#f59e0b','var(--danger)'];
+
+  const list = document.getElementById('reminder-list');
+  list.innerHTML = all.map(e => {
+    const [y, m, d] = e.date.split('-');
+    const dateLabel  = `${MONTHS[parseInt(m)-1].slice(0,3)} ${parseInt(d)}, ${y}`;
+    const isOverdue  = new Date(e.date) < now;
+    const priColor   = PRI_COLORS[e.priority || 3];
+    const priLabel   = PRI_LABELS[e.priority || 3];
+
+    return `
+      <div class="reminder-item${isOverdue ? ' r-overdue' : ' r-today'}"
+           onclick="reminderJump('${e.date}')">
+        <div class="reminder-item-left">
+          <div class="r-dot" style="background:${priColor}"></div>
+          <div>
+            <div class="r-name">${escHtml(e.name)}</div>
+            <div class="r-meta">
+              ${isOverdue ? '<span class="r-badge-overdue">OVERDUE</span>' : '<span class="r-badge-today">TODAY</span>'}
+              ${dateLabel}
+              ${e.time ? ' · ' + escHtml(e.time) : ''}
+              <span style="color:${priColor}"> · ${priLabel}</span>
+            </div>
+          </div>
+        </div>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="r-arrow">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>`;
+  }).join('');
+
+  // Show the popup
+  document.getElementById('reminder-overlay').classList.add('open');
+}
+
+function closeReminder() {
+  document.getElementById('reminder-overlay').classList.remove('open');
+}
+
+function reminderJump(dateStr) {
+  closeReminder();
+  if (!dateStr) return;
+  const [y, m] = dateStr.split('-');
+  viewYear  = parseInt(y);
+  viewMonth = parseInt(m) - 1;
+  renderCalendar();
+  updateStats();
+  updateUpcoming();
+  openPanel(dateStr);
+}
+
+
+/* ============================================
+   MY DAILY ROUTINE
+   Routine steps are saved in localStorage.
+   When the calendar renders, recurring events
+   are expanded onto the correct dates and
+   merged into eventsCache so they show on
+   the calendar grid just like regular events.
+   ============================================ */
+
+/* ── localStorage helpers ── */
+function getRoutineSteps() {
+  return JSON.parse(localStorage.getItem('wizz_routine') || '[]');
+}
+function saveRoutineSteps(steps) {
+  localStorage.setItem('wizz_routine', JSON.stringify(steps));
+}
+
+/* ── Routine state ── */
+let routineColor    = 0;
+let routineEditId   = null;   // null = adding new
+
+/* ── Open / close modal ── */
+function openRoutineModal() {
+  renderRoutineList();
+  // default start date to today
+  const today = new Date().toISOString().slice(0,10);
+  if (!document.getElementById('rt-start').value) {
+    document.getElementById('rt-start').value = today;
+  }
+  document.getElementById('routine-overlay').classList.add('open');
+}
+function closeRoutineModal() {
+  document.getElementById('routine-overlay').classList.remove('open');
+  cancelRoutineEdit();
+}
+function closeRoutineOutside(e) {
+  if (e.target === document.getElementById('routine-overlay')) closeRoutineModal();
+}
+
+/* ── Colour picker for routine ── */
+function pickRoutineColor(el) {
+  document.querySelectorAll('#routine-overlay .color-dot').forEach(d => d.classList.remove('active'));
+  el.classList.add('active');
+  routineColor = parseInt(el.dataset.rc);
+}
+
+/* ── Save / edit a routine step ── */
+function saveRoutineStep() {
+  const name   = document.getElementById('rt-name').value.trim();
+  const time   = document.getElementById('rt-time').value.trim();
+  const start  = document.getElementById('rt-start').value;
+  const repeat = document.querySelector('input[name="rt-repeat"]:checked').value;
+
+  if (!name) { alert('Please enter an activity name.'); return; }
+  if (!start){ alert('Please pick a start date.');      return; }
+
+  const steps = getRoutineSteps();
+
+  if (routineEditId !== null) {
+    // update existing
+    const idx = steps.findIndex(s => s.id === routineEditId);
+    if (idx !== -1) {
+      steps[idx] = { ...steps[idx], name, time, start, repeat, color: routineColor };
+    }
+    routineEditId = null;
+  } else {
+    // create new
+    steps.push({
+      id:     Date.now().toString(36),
+      name, time, start, repeat, color: routineColor
+    });
+  }
+
+  saveRoutineSteps(steps);
+
+  // reset form
+  document.getElementById('rt-name').value  = '';
+  document.getElementById('rt-time').value  = '';
+  document.querySelector('input[name="rt-repeat"][value="daily"]').checked = true;
+  routineColor = 0;
+  document.querySelectorAll('#routine-overlay .color-dot').forEach((d,i) => d.classList.toggle('active', i===0));
+  document.getElementById('rt-save-btn').textContent      = '+ ADD STEP';
+  document.getElementById('rt-cancel-btn').style.display  = 'none';
+  document.getElementById('routine-form-title').textContent = 'Add Routine Step';
+
+  renderRoutineList();
+
+  // refresh calendar so new recurring events show immediately
+  expandRoutineIntoCache();
+  renderCalendar();
+  updateStats();
+  updateUpcoming();
+}
+
+function cancelRoutineEdit() {
+  routineEditId = null;
+  document.getElementById('rt-name').value  = '';
+  document.getElementById('rt-time').value  = '';
+  document.querySelector('input[name="rt-repeat"][value="daily"]').checked = true;
+  routineColor = 0;
+  document.querySelectorAll('#routine-overlay .color-dot').forEach((d,i) => d.classList.toggle('active', i===0));
+  document.getElementById('rt-save-btn').textContent      = '+ ADD STEP';
+  document.getElementById('rt-cancel-btn').style.display  = 'none';
+  document.getElementById('routine-form-title').textContent = 'Add Routine Step';
+}
+
+/* ── Edit a step ── */
+function editRoutineStep(id) {
+  const steps = getRoutineSteps();
+  const step  = steps.find(s => s.id === id);
+  if (!step) return;
+
+  routineEditId = id;
+  document.getElementById('rt-name').value  = step.name;
+  document.getElementById('rt-time').value  = step.time || '';
+  document.getElementById('rt-start').value = step.start || '';
+  document.querySelector('input[name="rt-repeat"][value="' + step.repeat + '"]').checked = true;
+  routineColor = step.color || 0;
+  document.querySelectorAll('#routine-overlay .color-dot').forEach((d,i) => d.classList.toggle('active', i === routineColor));
+
+  document.getElementById('rt-save-btn').textContent      = '✓ SAVE STEP';
+  document.getElementById('rt-cancel-btn').style.display  = 'inline-block';
+  document.getElementById('routine-form-title').textContent = 'Edit Routine Step';
+  document.getElementById('rt-name').focus();
+}
+
+/* ── Delete a step ── */
+function deleteRoutineStep(id) {
+  const steps = getRoutineSteps().filter(s => s.id !== id);
+  saveRoutineSteps(steps);
+  renderRoutineList();
+  expandRoutineIntoCache();
+  renderCalendar();
+  updateStats();
+  updateUpcoming();
+}
+
+/* ── Render the list of saved steps inside the modal ── */
+function renderRoutineList() {
+  const steps  = getRoutineSteps();
+  const list   = document.getElementById('routine-steps-list');
+  const counter = document.getElementById('routine-steps-count');
+  const colorVars = ['var(--cyan)','var(--green)','var(--purple)','#f59e0b','var(--danger)'];
+  const repeatLabels = { daily: 'Every day', weekly: 'Every week', yearly: 'Every year' };
+
+  counter.textContent = steps.length + ' step' + (steps.length !== 1 ? 's' : '');
+
+  if (!steps.length) {
+    list.innerHTML = '<div class="routine-empty">No routine steps yet. Add one above!</div>';
+    return;
+  }
+
+  // Sort by time of day
+  const sorted = [...steps].sort((a,b) => (a.time||'').localeCompare(b.time||''));
+
+  list.innerHTML = sorted.map(s => `
+    <div class="routine-step-row">
+      <div class="routine-step-dot" style="background:${colorVars[s.color||0]}"></div>
+      <div class="routine-step-info">
+        <div class="routine-step-name">${escHtml(s.name)}</div>
+        <div class="routine-step-meta">
+          ${s.time ? s.time + ' · ' : ''}
+          ${repeatLabels[s.repeat] || s.repeat}
+          · from ${s.start}
+        </div>
+      </div>
+      <div class="routine-step-actions">
+        <button class="routine-edit-btn"   onclick="editRoutineStep('${s.id}')">✎</button>
+        <button class="routine-delete-btn" onclick="deleteRoutineStep('${s.id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+/* ── Core logic: expand routine steps into eventsCache ──
+   Called after loading API tasks and after any routine change.
+   We generate "virtual" event objects for the visible calendar
+   month +/- a few months so they appear on the grid.
+   These virtual events have ids prefixed with "rt-" so they
+   are never accidentally sent to the backend.
+─────────────────────────────────────────────────────────── */
+function expandRoutineIntoCache() {
+  const steps = getRoutineSteps();
+  if (!steps.length) return;
+
+  // Generate dates for 3 months around the current view
+  const from = new Date(viewYear, viewMonth - 1, 1);
+  const to   = new Date(viewYear, viewMonth + 2, 0);  // last day of month+1
+
+  // Remove any previously expanded routine events from cache
+  eventsCache = eventsCache.filter(e => !e.isRoutine);
+
+  const colorVars = [0,1,2,3,4];
+
+  steps.forEach(step => {
+    const startDate = new Date(step.start);
+    if (isNaN(startDate)) return;
+
+    // Walk every day in range and check if this step falls on it
+    const cursor = new Date(from);
+    while (cursor <= to) {
+      const cursorStr = cursor.toISOString().slice(0,10);
+      let matches = false;
+
+      if (step.repeat === 'daily') {
+        matches = cursor >= startDate;
+      } else if (step.repeat === 'weekly') {
+        // same weekday as the start date
+        matches = cursor >= startDate && cursor.getDay() === startDate.getDay();
+      } else if (step.repeat === 'yearly') {
+        // same month+day as the start date, any year from start onwards
+        matches = cursor >= startDate &&
+                  cursor.getMonth()  === startDate.getMonth() &&
+                  cursor.getDate()   === startDate.getDate();
+      }
+
+      if (matches) {
+        eventsCache.push({
+          id:        'rt-' + step.id + '-' + cursorStr,
+          date:      cursorStr,
+          name:      step.name,
+          time:      step.time || '',
+          color:     step.color || 0,
+          priority:  3,
+          done:      false,
+          isRoutine: true,   // flag so we never try to POST this to the API
+          routineId: step.id
+        });
+      }
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  });
 }
 
 /* ============================================

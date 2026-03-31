@@ -6,9 +6,12 @@ const filePath = path.join(__dirname, '..', 'wizz.json');
 function load() {
   try {
     const data = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    // Ensure notifications array exists (backwards compat)
+    if (!parsed.notifications) parsed.notifications = [];
+    return parsed;
   } catch (e) {
-    if (e.code === 'ENOENT') return { users: [], tasks: [] };
+    if (e.code === 'ENOENT') return { users: [], tasks: [], notifications: [] };
     throw e;
   }
 }
@@ -112,6 +115,116 @@ const db = {
     data.tasks.splice(idx, 1);
     save(data);
     return { changes: 1 };
+  },
+
+  // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
+
+  /**
+   * Get all notifications for a user, newest first.
+   */
+  getNotificationsByUserId(userId) {
+    const data = load();
+    return (data.notifications || [])
+      .filter(n => n.user_id === userId)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  },
+
+  /**
+   * Get count of unread notifications for a user.
+   */
+  getUnreadCount(userId) {
+    const data = load();
+    return (data.notifications || []).filter(n => n.user_id === userId && !n.read).length;
+  },
+
+  /**
+   * Create a notification.
+   * type: 'deadline_today' | 'deadline_soon' | 'overdue' | 'task_created' | 'task_completed'
+   */
+  createNotification({ user_id, type, title, message, task_id = null }) {
+    const data = load();
+    if (!data.notifications) data.notifications = [];
+    const id = nextId(data.notifications);
+    const notification = {
+      id,
+      user_id,
+      type,
+      title,
+      message,
+      task_id,
+      read: false,
+      created_at: now(),
+    };
+    data.notifications.push(notification);
+    save(data);
+    return notification;
+  },
+
+  /**
+   * Mark a single notification as read.
+   */
+  markNotificationRead(id, userId) {
+    const data = load();
+    if (!data.notifications) return null;
+    const idx = data.notifications.findIndex(n => n.id === id && n.user_id === userId);
+    if (idx === -1) return null;
+    data.notifications[idx].read = true;
+    save(data);
+    return data.notifications[idx];
+  },
+
+  /**
+   * Mark ALL notifications for a user as read.
+   */
+  markAllNotificationsRead(userId) {
+    const data = load();
+    if (!data.notifications) return 0;
+    let count = 0;
+    data.notifications.forEach(n => {
+      if (n.user_id === userId && !n.read) {
+        n.read = true;
+        count++;
+      }
+    });
+    save(data);
+    return count;
+  },
+
+  /**
+   * Delete a notification.
+   */
+  deleteNotification(id, userId) {
+    const data = load();
+    if (!data.notifications) return { changes: 0 };
+    const idx = data.notifications.findIndex(n => n.id === id && n.user_id === userId);
+    if (idx === -1) return { changes: 0 };
+    data.notifications.splice(idx, 1);
+    save(data);
+    return { changes: 1 };
+  },
+
+  /**
+   * Delete all notifications for a user.
+   */
+  clearNotifications(userId) {
+    const data = load();
+    if (!data.notifications) return 0;
+    const before = data.notifications.length;
+    data.notifications = data.notifications.filter(n => n.user_id !== userId);
+    save(data);
+    return before - data.notifications.length;
+  },
+
+  /**
+   * Check if a deadline notification of a given type already exists
+   * for this task (prevents duplicate alerts on every poll cycle).
+   */
+  notificationExists(userId, taskId, type) {
+    const data = load();
+    if (!data.notifications) return false;
+    return data.notifications.some(
+      n => n.user_id === userId && n.task_id === taskId && n.type === type
+    );
   },
 };
 

@@ -4,10 +4,13 @@ const cors = require('cors');
 
 require('./lib/db'); // create DB and tables on startup
 
-const authRoutes = require('./routes/auth');
-const taskRoutes = require('./routes/tasks');
+const authRoutes         = require('./routes/auth');
+const taskRoutes         = require('./routes/tasks');
+const notificationRoutes = require('./routes/notifications');
 
-const app = express();
+const { startNotificationChecker } = require('./lib/notificationChecker');
+
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -18,7 +21,8 @@ app.use(express.static('public'));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api', authRoutes);
-app.use('/api/tasks', taskRoutes);
+app.use('/api/tasks',         taskRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 app.use((err, req, res, next) => {
@@ -28,4 +32,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`WIZZ API running at http://localhost:${PORT}`);
+  // Start background deadline checker after server is up
+  startNotificationChecker();
 });

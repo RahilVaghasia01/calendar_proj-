@@ -219,6 +219,7 @@
         </div>
 
         <div class="topbar-right">
+          <button class="btn ghost board-open-btn" onclick="openBoardModal()">🎯 Mission Board</button>
           <button class="btn ghost"     onclick="exportCSV()">⬇ CSV</button>
           <button class="btn ghost red" onclick="logout()">Logout</button>
         </div>
@@ -290,8 +291,13 @@
             </div>
           </div>
 
-          <button class="priority-board-toggle" onclick="showPage('board')">
-            🎯 Priority Mission Board
+          <!-- ── MY ROUTINE BUTTON ── -->
+          <button class="routine-open-btn" onclick="openRoutineModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            My Daily Routine
           </button>
 
         </div>
@@ -301,90 +307,78 @@
   </div><!-- /page-app -->
 
   <!-- ══════════════════════════════════════
-       PAGE: PRIORITY BOARD
+       PRIORITY MISSION BOARD — MODAL
   ══════════════════════════════════════ -->
-  <div class="app-page" id="page-board">
+  <div class="board-overlay" id="board-overlay" onclick="closeBoardOutside(event)">
+    <div class="board-modal">
 
-    <div class="topbar">
-      <div class="topbar-inner">
-        <div class="topbar-left">
-          <button class="btn ghost" onclick="showPage('app')" style="font-size:.7rem;padding:7px 16px">◀ Back to Calendar</button>
+      <!-- Modal header -->
+      <div class="board-modal-header">
+        <div class="task-board-title">
+          <span class="task-board-icon">🎯</span> Priority Mission Board
+        </div>
+        <div class="board-modal-right">
+          <div class="task-board-filters">
+            <button class="tb-filter active" data-f="all"     onclick="setTaskFilter(this)">All</button>
+            <button class="tb-filter"        data-f="pending" onclick="setTaskFilter(this)">Pending</button>
+            <button class="tb-filter"        data-f="done"    onclick="setTaskFilter(this)">Done</button>
+            <button class="tb-filter"        data-f="overdue" onclick="setTaskFilter(this)">Overdue</button>
+          </div>
+          <button class="board-close-btn" onclick="closeBoardModal()" title="Close">✕</button>
         </div>
       </div>
-    </div>
 
-    <div class="app-body">
-      <!-- ══════════════════════════════════════
-           PRIORITY TASK BOARD
-           Full-width section below calendar
-      ══════════════════════════════════════ -->
-      <div class="task-board-wrap">
-        <div class="task-board-header">
-          <div class="task-board-title">
-            <span class="task-board-icon">🎯</span> Priority Mission Board
+      <!-- Five priority lanes -->
+      <div class="task-lanes board-lanes" id="task-lanes">
+
+        <div class="task-lane" id="lane-5">
+          <div class="lane-header">
+            <span class="lane-dot" style="background:var(--danger)"></span>
+            <span class="lane-label">HIGH</span>
+            <span class="lane-count" id="lane-count-5">0</span>
           </div>
-          <div class="task-board-filters">
-            <button class="tb-filter active" data-f="all"      onclick="setTaskFilter(this)">All</button>
-            <button class="tb-filter"        data-f="pending"  onclick="setTaskFilter(this)">Pending</button>
-            <button class="tb-filter"        data-f="done"     onclick="setTaskFilter(this)">Done</button>
-            <button class="tb-filter"        data-f="overdue"  onclick="setTaskFilter(this)">Overdue</button>
-          </div>
+          <div class="lane-cards" id="lane-cards-5"></div>
         </div>
 
-        <!-- Five priority lanes -->
-        <div class="task-lanes" id="task-lanes">
-
-          <div class="task-lane" id="lane-5">
-            <div class="lane-header">
-              <span class="lane-dot" style="background:var(--danger)"></span>
-              <span class="lane-label">HIGH</span>
-              <span class="lane-count" id="lane-count-5">0</span>
-            </div>
-            <div class="lane-cards" id="lane-cards-5"></div>
+        <div class="task-lane" id="lane-4">
+          <div class="lane-header">
+            <span class="lane-dot" style="background:#f59e0b"></span>
+            <span class="lane-label">MED+</span>
+            <span class="lane-count" id="lane-count-4">0</span>
           </div>
+          <div class="lane-cards" id="lane-cards-4"></div>
+        </div>
 
-          <div class="task-lane" id="lane-4">
-            <div class="lane-header">
-              <span class="lane-dot" style="background:#f59e0b"></span>
-              <span class="lane-label">MED+</span>
-              <span class="lane-count" id="lane-count-4">0</span>
-            </div>
-            <div class="lane-cards" id="lane-cards-4"></div>
+        <div class="task-lane" id="lane-3">
+          <div class="lane-header">
+            <span class="lane-dot" style="background:var(--purple)"></span>
+            <span class="lane-label">MED</span>
+            <span class="lane-count" id="lane-count-3">0</span>
           </div>
+          <div class="lane-cards" id="lane-cards-3"></div>
+        </div>
 
-          <div class="task-lane" id="lane-3">
-            <div class="lane-header">
-              <span class="lane-dot" style="background:var(--purple)"></span>
-              <span class="lane-label">MED</span>
-              <span class="lane-count" id="lane-count-3">0</span>
-            </div>
-            <div class="lane-cards" id="lane-cards-3"></div>
+        <div class="task-lane" id="lane-2">
+          <div class="lane-header">
+            <span class="lane-dot" style="background:var(--cyan)"></span>
+            <span class="lane-label">MED−</span>
+            <span class="lane-count" id="lane-count-2">0</span>
           </div>
+          <div class="lane-cards" id="lane-cards-2"></div>
+        </div>
 
-          <div class="task-lane" id="lane-2">
-            <div class="lane-header">
-              <span class="lane-dot" style="background:var(--cyan)"></span>
-              <span class="lane-label">MED−</span>
-              <span class="lane-count" id="lane-count-2">0</span>
-            </div>
-            <div class="lane-cards" id="lane-cards-2"></div>
+        <div class="task-lane" id="lane-1">
+          <div class="lane-header">
+            <span class="lane-dot" style="background:var(--green)"></span>
+            <span class="lane-label">LOW</span>
+            <span class="lane-count" id="lane-count-1">0</span>
           </div>
+          <div class="lane-cards" id="lane-cards-1"></div>
+        </div>
 
-          <div class="task-lane" id="lane-1">
-            <div class="lane-header">
-              <span class="lane-dot" style="background:var(--green)"></span>
-              <span class="lane-label">LOW</span>
-              <span class="lane-count" id="lane-count-1">0</span>
-            </div>
-            <div class="lane-cards" id="lane-cards-1"></div>
-          </div>
-
-        </div><!-- /task-lanes -->
-      </div><!-- /task-board-wrap -->
-    </div>
-
-  </div><!-- /page-board -->
-
+      </div><!-- /task-lanes -->
+    </div><!-- /board-modal -->
+  </div><!-- /board-overlay -->
 
 
   <!-- ══════════════════════════════════════
@@ -481,6 +475,120 @@
     </div>
   </div>
 
+
+  <!-- ══════════════════════════════════════
+       LOGIN REMINDER POPUP
+  ══════════════════════════════════════ -->
+  <div class="reminder-overlay" id="reminder-overlay">
+    <div class="reminder-modal">
+
+      <div class="reminder-header">
+        <div class="reminder-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          Mission Briefing
+        </div>
+        <button class="reminder-close" onclick="closeReminder()">✕</button>
+      </div>
+
+      <div class="reminder-subtitle" id="reminder-subtitle">You have tasks that need attention</div>
+
+      <div class="reminder-list" id="reminder-list"></div>
+
+      <button class="btn reminder-btn" onclick="closeReminder()">GOT IT, COMMANDER</button>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       MY ROUTINE MODAL
+  ══════════════════════════════════════ -->
+  <div class="routine-overlay" id="routine-overlay" onclick="closeRoutineOutside(event)">
+    <div class="routine-modal">
+
+      <div class="routine-header">
+        <div class="routine-title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          My Daily Routine
+        </div>
+        <button class="routine-close" onclick="closeRoutineModal()">✕</button>
+      </div>
+
+      <!-- Add a new routine step -->
+      <div class="routine-form">
+        <div class="routine-form-title" id="routine-form-title">Add Routine Step</div>
+
+        <div class="routine-form-row">
+          <div class="field" style="flex:1">
+            <label>Activity Name</label>
+            <div class="input-wrap">
+              <input type="text" id="rt-name" placeholder="e.g. Morning Run" style="padding-left:14px"/>
+            </div>
+          </div>
+          <div class="field" style="flex:0 0 110px">
+            <label>Time</label>
+            <input type="text" id="rt-time" class="bare" placeholder="07:00 AM"/>
+          </div>
+        </div>
+
+        <!-- Repeat options -->
+        <div class="field">
+          <label>Repeat</label>
+          <div class="repeat-options">
+            <label class="repeat-opt">
+              <input type="radio" name="rt-repeat" value="daily" checked/> Every Day
+            </label>
+            <label class="repeat-opt">
+              <input type="radio" name="rt-repeat" value="weekly"/> Every Week
+              <span class="repeat-sub">(same weekday)</span>
+            </label>
+            <label class="repeat-opt">
+              <input type="radio" name="rt-repeat" value="yearly"/> Every Year
+              <span class="repeat-sub">(same date)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Start date -->
+        <div class="routine-form-row">
+          <div class="field" style="flex:1">
+            <label>Start Date</label>
+            <input type="date" id="rt-start" class="bare"/>
+          </div>
+          <div class="field" style="flex:0 0 90px">
+            <label>Colour</label>
+            <div class="color-pick" style="margin-top:4px">
+              <div class="color-dot active" style="background:var(--cyan)"   data-rc="0" onclick="pickRoutineColor(this)"></div>
+              <div class="color-dot"        style="background:var(--green)"  data-rc="1" onclick="pickRoutineColor(this)"></div>
+              <div class="color-dot"        style="background:var(--purple)" data-rc="2" onclick="pickRoutineColor(this)"></div>
+              <div class="color-dot"        style="background:#f59e0b"       data-rc="3" onclick="pickRoutineColor(this)"></div>
+              <div class="color-dot"        style="background:var(--danger)" data-rc="4" onclick="pickRoutineColor(this)"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="routine-form-actions">
+          <button class="btn" id="rt-save-btn" onclick="saveRoutineStep()">+ ADD STEP</button>
+          <button class="btn ghost" id="rt-cancel-btn" onclick="cancelRoutineEdit()" style="display:none">✕ CANCEL</button>
+        </div>
+      </div>
+
+      <!-- Existing routine steps list -->
+      <div class="routine-steps-wrap">
+        <div class="routine-steps-title">Your Routine
+          <span class="routine-steps-count" id="routine-steps-count">0 steps</span>
+        </div>
+        <div class="routine-steps-list" id="routine-steps-list">
+          <div class="routine-empty">No routine steps yet. Add one above!</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <!-- JavaScript -->
   <script src="app.js"></script>
