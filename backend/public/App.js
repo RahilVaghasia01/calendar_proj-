@@ -188,6 +188,7 @@ async function loadEventsFromAPI() {
     eventsCache = tasksCache.map(taskToEvent).filter(e => e.date !== null);
     expandRoutineIntoCache();   // add recurring routine events on top
     renderTaskBoard();
+    updateRescheduleBadge();   // keep overdue badge current
   } catch (e) {
     if (e.message.toLowerCase().includes('token') || e.message.includes('401')) logout();
     tasksCache  = [];
@@ -1350,6 +1351,218 @@ document.getElementById('ev-time').addEventListener('change', () => {
 });
 
 
+
+/* ============================================
+   AUTOMATIC RESCHEDULING SUGGESTIONS
+   ============================================ */
+
+/* ── Open / close ── */
+function openReschedulePanel() {
+  buildRescheduleSuggestions();
+  document.getElementById('reschedule-overlay').classList.add('open');
+}
+
+function closeReschedulePanel() {
+  document.getElementById('reschedule-overlay').classList.remove('open');
+}
+
+function closeRescheduleOutside(e) {
+  if (e.target === document.getElementById('reschedule-overlay')) closeReschedulePanel();
+}
+
+/* ── Core logic: find overdue tasks, compute next available date ── */
+function buildRescheduleSuggestions() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Collect all dates that already have at least one non-done event
+  const busyDates = new Set(
+    getUserEvents()
+      .filter(e => !e.done && e.date)
+      .map(e => e.date)
+  );
+
+  // Filter to overdue, non-done, non-routine tasks only
+  const overdue = tasksCache
+    .filter(t => {
+      if (t.status === 'done' || !t.deadline) return false;
+      const dl = new Date(t.deadline.slice(0, 10));
+      dl.setHours(0, 0, 0, 0);
+      return dl < today;
+    })
+    .sort((a, b) => (b.priority || 3) - (a.priority || 3)); // highest priority first
+
+  // Update button badge
+  const badge = document.getElementById('reschedule-badge');
+  const btn   = document.getElementById('reschedule-open-btn');
+  if (badge && btn) {
+    if (overdue.length > 0) {
+      badge.textContent    = overdue.length;
+      badge.style.display  = 'inline-flex';
+      btn.classList.add('has-overdue');
+    } else {
+      badge.style.display  = 'none';
+      btn.classList.remove('has-overdue');
+    }
+  }
+
+  // Update subtitle
+  const subtitle = document.getElementById('reschedule-subtitle');
+  if (overdue.length === 0) {
+    subtitle.textContent = 'All missions are on schedule.';
+  } else {
+    subtitle.textContent =
+      `${overdue.length} overdue mission${overdue.length !== 1 ? 's' : ''} found — suggested new dates below.`;
+  }
+
+  // Show/hide Accept All button
+  const bulk = document.getElementById('reschedule-bulk');
+  if (bulk) bulk.style.display = overdue.length ? 'block' : 'none';
+
+  // Render cards
+  const list = document.getElementById('reschedule-list');
+  if (!overdue.length) {
+    list.innerHTML = '<div class="reschedule-empty">All missions are on schedule, Commander. 🚀</div>';
+    return;
+  }
+
+  const PRI_COLORS = ['','var(--green)','var(--cyan)','var(--purple)','#f59e0b','var(--danger)'];
+  const PRI_LABELS = ['','LOW','MED-','MED','MED+','HIGH'];
+
+  list.innerHTML = overdue.map(t => {
+    const suggested  = nextAvailableDate(today, busyDates);
+    const suggestedStr = suggested.toISOString().slice(0, 10);
+    // Mark this date as used so next task gets a different slot
+    busyDates.add(suggestedStr);
+
+    const [oy, om, od] = t.deadline.slice(0, 10).split('-');
+    const wasLabel = `${MONTHS[parseInt(om)-1].slice(0,3)} ${parseInt(od)}, ${oy}`;
+    const [sy, sm, sd] = suggestedStr.split('-');
+    const sugLabel = `${MONTHS[parseInt(sm)-1].slice(0,3)} ${parseInt(sd)}, ${sy}`;
+    const priColor = PRI_COLORS[t.priority || 3];
+
+    return `
+      <div class="rs-card" id="rs-card-${t.id}">
+        <div class="rs-card-top">
+          <div class="rs-pri-dot" style="background:${priColor}"></div>
+          <div class="rs-info">
+            <div class="rs-name">${escHtml(t.title)}</div>
+            <div class="rs-was-due">Was due: ${wasLabel} · ${PRI_LABELS[t.priority||3]}</div>
+          </div>
+        </div>
+        <div class="rs-suggest">
+          <span class="rs-suggest-label">Suggest →</span>
+          <span class="rs-suggest-date">${sugLabel}</span>
+          <input type="date"
+                 class="rs-date-input"
+                 id="rs-date-${t.id}"
+                 value="${suggestedStr}"
+                 min="${today.toISOString().slice(0,10)}"
+                 title="Override suggested date"/>
+        </div>
+        <div class="rs-actions">
+          <button class="rs-accept-btn" onclick="acceptSuggestion(${t.id})">✓ ACCEPT</button>
+          <button class="rs-skip-btn"   onclick="skipSuggestion(${t.id})">SKIP</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ── Find the next date that isn't already busy ── */
+function nextAvailableDate(fromDate, busyDates) {
+  const cursor = new Date(fromDate);
+  // Start from tomorrow
+  cursor.setDate(cursor.getDate() + 1);
+  // Walk forward until we find a free day (max 60-day search)
+  for (let i = 0; i < 60; i++) {
+    const str = cursor.toISOString().slice(0, 10);
+    if (!busyDates.has(str)) return new Date(cursor);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return new Date(cursor); // fallback: just return whatever we landed on
+}
+
+/* ── Accept a single suggestion ── */
+async function acceptSuggestion(taskId) {
+  const input = document.getElementById('rs-date-' + taskId);
+  const newDate = input ? input.value : null;
+  if (!newDate) return;
+
+  try {
+    await api('/api/tasks/' + taskId, {
+      method: 'PATCH',
+      body: JSON.stringify({ deadline: newDate })
+    });
+    // Visual feedback before reload
+    const card = document.getElementById('rs-card-' + taskId);
+    if (card) card.classList.add('rs-accepted');
+
+    // Reload data and rebuild
+    await loadEventsFromAPI();
+    renderCalendar();
+    updateStats();
+    updateUpcoming();
+    // Rebuild panel (overdue count may have changed)
+    setTimeout(buildRescheduleSuggestions, 350);
+  } catch (e) {
+    alert('⚠ Could not reschedule: ' + e.message);
+  }
+}
+
+/* ── Skip a card (just remove it from the panel visually) ── */
+function skipSuggestion(taskId) {
+  const card = document.getElementById('rs-card-' + taskId);
+  if (!card) return;
+  card.style.transition = 'opacity .25s, transform .25s';
+  card.style.opacity    = '0';
+  card.style.transform  = 'translateX(30px)';
+  setTimeout(() => {
+    card.remove();
+    // If no cards left, show empty state
+    const list = document.getElementById('reschedule-list');
+    if (!list.querySelector('.rs-card')) {
+      list.innerHTML = '<div class="reschedule-empty">No more suggestions. Well done, Commander! 🚀</div>';
+      const bulk = document.getElementById('reschedule-bulk');
+      if (bulk) bulk.style.display = 'none';
+    }
+  }, 280);
+}
+
+/* ── Accept ALL suggestions at once ── */
+async function acceptAllSuggestions() {
+  const cards = document.querySelectorAll('.rs-card:not(.rs-accepted)');
+  for (const card of cards) {
+    const idMatch = card.id.match(/rs-card-(\d+)/);
+    if (!idMatch) continue;
+    await acceptSuggestion(parseInt(idMatch[1]));
+    // tiny delay so it doesn't hammer the API
+    await new Promise(r => setTimeout(r, 120));
+  }
+}
+
+/* ── Refresh badge count whenever events reload ── */
+function updateRescheduleBadge() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const count = tasksCache.filter(t => {
+    if (t.status === 'done' || !t.deadline) return false;
+    const dl = new Date(t.deadline.slice(0, 10));
+    dl.setHours(0, 0, 0, 0);
+    return dl < today;
+  }).length;
+
+  const badge = document.getElementById('reschedule-badge');
+  const btn   = document.getElementById('reschedule-open-btn');
+  if (!badge || !btn) return;
+  if (count > 0) {
+    badge.textContent   = count;
+    badge.style.display = 'inline-flex';
+    btn.classList.add('has-overdue');
+  } else {
+    badge.style.display = 'none';
+    btn.classList.remove('has-overdue');
+  }
+}
 
 /* ============================================
    BOOT

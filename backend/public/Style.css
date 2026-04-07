@@ -2374,3 +2374,283 @@ input.bare:focus {
   border: 1px dashed rgba(255,255,255,.4);
   opacity: .85;
 }
+/* ============================================
+   RESCHEDULE PANEL
+   ============================================ */
+
+/* ── Sidebar button variant ── */
+.reschedule-open-btn {
+  margin-top: 8px;
+  border-color: rgba(139,92,246,.3) !important;
+  color: var(--purple) !important;
+  position: relative;
+}
+.reschedule-open-btn:hover {
+  border-color: var(--purple) !important;
+  background: rgba(139,92,246,.1) !important;
+  color: #fff !important;
+}
+.reschedule-open-btn.has-overdue {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+  animation: pulse-border 2s ease infinite;
+}
+@keyframes pulse-border {
+  0%,100% { box-shadow: none; }
+  50%      { box-shadow: 0 0 10px rgba(255,77,109,.35); }
+}
+
+/* ── Overdue count badge on the button ── */
+.reschedule-badge {
+  min-width: 18px; height: 18px;
+  padding: 0 4px;
+  background: var(--danger);
+  color: #fff;
+  font-family: 'Orbitron', monospace;
+  font-size: .58rem;
+  font-weight: 700;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+/* ── Overlay (click-outside backdrop) ── */
+.reschedule-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8500;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(0,0,0,0);
+  pointer-events: none;
+  transition: background .25s;
+}
+.reschedule-overlay.open {
+  background: rgba(0,0,0,.45);
+  pointer-events: all;
+}
+
+/* ── Slide-in panel ── */
+.reschedule-panel {
+  width: 360px;
+  max-width: 95vw;
+  height: 100%;
+  background: rgba(6,13,31,.97);
+  border-left: 1px solid rgba(139,92,246,.25);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+  box-shadow: -12px 0 40px rgba(0,0,0,.5);
+}
+.reschedule-overlay.open .reschedule-panel {
+  transform: translateX(0);
+}
+
+/* ── Header ── */
+.reschedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid rgba(139,92,246,.15);
+  flex-shrink: 0;
+}
+.reschedule-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Orbitron', monospace;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--purple);
+}
+.reschedule-close {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: none;
+  border: 1px solid rgba(139,92,246,.2);
+  border-radius: 7px;
+  color: var(--dim);
+  cursor: pointer;
+  font-size: .85rem;
+  transition: all .15s;
+}
+.reschedule-close:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ── Subtitle line ── */
+.reschedule-subtitle {
+  padding: 10px 18px 6px;
+  font-size: .73rem;
+  color: var(--dim);
+  flex-shrink: 0;
+}
+
+/* ── Accept-all row ── */
+.reschedule-bulk {
+  padding: 0 18px 10px;
+  flex-shrink: 0;
+}
+.reschedule-accept-all-btn {
+  width: 100%;
+  font-size: .72rem;
+  padding: 8px 0;
+  background: rgba(139,92,246,.15);
+  border-color: rgba(139,92,246,.4);
+  color: #c4b5fd;
+}
+.reschedule-accept-all-btn:hover {
+  background: rgba(139,92,246,.28);
+  border-color: var(--purple);
+  color: #fff;
+}
+
+/* ── Scrollable list ── */
+.reschedule-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0 16px;
+}
+.reschedule-list::-webkit-scrollbar { width: 4px; }
+.reschedule-list::-webkit-scrollbar-track { background: transparent; }
+.reschedule-list::-webkit-scrollbar-thumb { background: rgba(139,92,246,.25); border-radius: 2px; }
+
+.reschedule-empty {
+  padding: 40px 18px;
+  text-align: center;
+  color: var(--dim);
+  font-size: .8rem;
+  font-style: italic;
+  line-height: 1.6;
+}
+
+/* ── Individual suggestion card ── */
+.rs-card {
+  margin: 8px 14px;
+  border: 1px solid rgba(139,92,246,.18);
+  border-radius: 12px;
+  background: rgba(139,92,246,.05);
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.rs-card:hover { border-color: rgba(139,92,246,.38); }
+
+.rs-card-top {
+  padding: 11px 14px 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.rs-pri-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.rs-info { flex: 1; min-width: 0; }
+.rs-name {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--star);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rs-was-due {
+  font-size: .67rem;
+  color: var(--danger);
+  margin-top: 2px;
+}
+
+/* ── Suggestion row (date + override) ── */
+.rs-suggest {
+  padding: 8px 14px 10px;
+  border-top: 1px solid rgba(139,92,246,.1);
+  background: rgba(0,0,0,.18);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rs-suggest-label {
+  font-size: .66rem;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.rs-suggest-date {
+  font-family: 'Orbitron', monospace;
+  font-size: .68rem;
+  color: var(--green);
+  font-weight: 600;
+  flex: 1;
+}
+/* Inline date override input */
+.rs-date-input {
+  background: rgba(0,200,255,.06);
+  border: 1px solid rgba(0,200,255,.2);
+  border-radius: 6px;
+  color: var(--star);
+  font-size: .7rem;
+  padding: 3px 7px;
+  width: 130px;
+  color-scheme: dark;
+}
+.rs-date-input:focus {
+  outline: none;
+  border-color: var(--cyan);
+}
+
+/* ── Action buttons on each card ── */
+.rs-actions {
+  padding: 0 14px 12px;
+  display: flex;
+  gap: 8px;
+}
+.rs-accept-btn {
+  flex: 1;
+  padding: 7px 0;
+  font-size: .71rem;
+  background: rgba(0,255,204,.1);
+  border: 1px solid rgba(0,255,204,.3);
+  border-radius: 8px;
+  color: var(--green);
+  cursor: pointer;
+  font-family: 'Orbitron', monospace;
+  letter-spacing: .04em;
+  transition: all .17s;
+}
+.rs-accept-btn:hover {
+  background: rgba(0,255,204,.2);
+  border-color: var(--green);
+  color: #fff;
+}
+.rs-skip-btn {
+  padding: 7px 14px;
+  font-size: .71rem;
+  background: none;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  color: var(--dim);
+  cursor: pointer;
+  transition: all .17s;
+}
+.rs-skip-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ── "Done" state after accepting ── */
+.rs-card.rs-accepted {
+  opacity: .45;
+  pointer-events: none;
+  border-color: rgba(0,255,204,.2);
+}
+.rs-card.rs-accepted .rs-name::after {
+  content: ' ✔ Rescheduled';
+  font-size: .68rem;
+  color: var(--green);
+  font-weight: 400;
+}
