@@ -1,8 +1,7 @@
-/* ============================================
+/* 
    WIZZ · Space Calendar — JavaScript
    app.js  (API-connected + Search + Completion)
-   ============================================ */
-
+*/
 /* ── STAR FIELD GENERATOR ── */
 (function generateStars() {
   const layer = document.getElementById('stars');
@@ -23,9 +22,7 @@
   }
 })();
 
-/* ============================================
-   API HELPER
-   ============================================ */
+/* API HELPER */
 const API_BASE = '';
 
 function getToken()     { return localStorage.getItem('wizz_token'); }
@@ -49,18 +46,14 @@ async function api(path, options = {}) {
   return data;
 }
 
-/* ============================================
-   PAGE NAVIGATION
-   ============================================ */
+/* PAGE NAVIGATION */
 function showPage(name) {
   document.querySelectorAll('.page, .app-page').forEach(p => p.classList.remove('active'));
   const page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
 }
 
-/* ============================================
-   UI HELPERS
-   ============================================ */
+/*UI HELPERS */
 function setLoading(btnId, loading, label) {
   const btn = document.getElementById(btnId);
   btn.disabled    = loading;
@@ -78,9 +71,7 @@ function escHtml(s) {
   return div.innerHTML;
 }
 
-/* ============================================
-   AUTH — LOGIN
-   ============================================ */
+/* AUTH — LOGIN */
 document.getElementById('loginBtn').onclick = async () => {
   const ident = document.getElementById('l-ident').value.trim();
   const pass  = document.getElementById('l-pass').value;
@@ -104,9 +95,7 @@ document.getElementById('loginBtn').onclick = async () => {
   }
 };
 
-/* ============================================
-   AUTH — REGISTER
-   ============================================ */
+/* AUTH — REGISTER */
 document.getElementById('registerBtn').onclick = async () => {
   const username = document.getElementById('r-user').value.trim();
   const email    = document.getElementById('r-email').value.trim();
@@ -150,9 +139,7 @@ function launchApp(username) {
   initCalendar();
 }
 
-/* ============================================
-   CALENDAR STATE
-   ============================================ */
+/* CALENDAR STATE */
 let viewYear, viewMonth;
 let selectedDate  = null;
 let selectedColor    = 0;
@@ -219,9 +206,7 @@ function changeMonth(dir) {
   updateUpcoming();
 }
 
-/* ============================================
-   RENDER CALENDAR
-   ============================================ */
+/* RENDER CALENDAR */
 function renderCalendar() {
   document.getElementById('cal-month-label').textContent = `${MONTHS[viewMonth]} ${viewYear}`;
 
@@ -274,9 +259,7 @@ function renderCalendar() {
   });
 }
 
-/* ============================================
-   EVENT PANEL
-   ============================================ */
+/* EVENT PANEL */
 function openPanel(dateStr) {
   selectedDate = dateStr;
   editingId    = null;
